@@ -10,7 +10,10 @@ param = mnist.cfg_param()
 param.batch_size = 500
 param.num_round = 800
 param.num_hidden = 100
+
+# change the following line to PATH/TO/MNIST dataset
 param.path_data = '../../../../data/mnist'
+
 param.net_type = 'mlp2'
 param.updater  = 'hmc'
 param.hyperupdater = 'gibbs-sep'
