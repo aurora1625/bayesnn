@@ -56,7 +56,7 @@ def cfg_param():
     param.num_class = 10
     param.eta = 0.1
     param.mdecay = 0.1
-    param.wd = 0.0
+    param.wd = 0.00002
     param.batch_size = 500
     return param
 
