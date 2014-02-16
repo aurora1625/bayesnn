@@ -1,5 +1,5 @@
 """
-  Implementation of neutral network 
+  Implementation of neural network 
   Core implementations
   Tianqi Chen
 """
@@ -183,6 +183,61 @@ class NNEvaluator:
 
         ninst = self.ylabels.size
         fo.write( ' %s-err:%f %s-nlik:%f' % ( self.prefix, sum_bad/ninst, self.prefix, -sum_loglike/ninst) )
+
+
+class NNEvaluatorMerck:
+    def __init__( self, nnet, xdatas, ylabels, param, prefix='' ):
+        self.nnet = nnet
+        self.xdatas  = xdatas
+        self.ylabels = ylabels
+        self.param = param
+        self.prefix = prefix
+        nbatch, nclass = nnet.o_node.shape
+        assert xdatas.shape[0] == ylabels.shape[0]
+        assert nbatch == xdatas.shape[1]
+        assert nbatch == ylabels.shape[1]
+        self.o_pred  = np.zeros( ( xdatas.shape[0], nbatch, nclass ), 'float32'  )
+        self.rcounter = 0
+        self.sum_wsample = 0.0
+
+    def __get_alpha( self ):
+        if self.rcounter < self.param.num_burn:
+            return 1.0
+        else:
+            self.sum_wsample += self.param.wsample
+            return self.param.wsample / self.sum_wsample
+        
+    def eval( self, rcounter, fo ):
+        self.rcounter = rcounter
+        alpha = self.__get_alpha()        
+        self.o_pred[:] *= ( 1.0 - alpha )
+        sum_bad  = 0.0
+        sum_loglike = 0.0
+        y_predFull = np.array([])
+        y_trueFull = np.array([])
+
+        #need to fix functions for prediction:
+        for i in xrange( self.xdatas.shape[0] ):
+            self.o_pred[i,:] += alpha * self.nnet.predict( self.xdatas[i] )
+            y_pred = np.argmax( self.o_pred[i,:], 1 )   #THESE LINES need to be changed for the proper predicted value          
+            y_predFull = np.append(y_predFull, y_pred )        #store all predicted values            
+            y_trueFull = np.append(y_trueFull, self.ylabels[i,:] )      #can speed up by not using append..
+
+
+            for j in xrange( self.xdatas.shape[1] ):
+                sum_loglike += np.log( self.o_pred[ i , j, self.ylabels[i,j] ] )
+
+        ninst = self.ylabels.size
+
+        avgTrue = np.mean(y_trueFull)
+        avgPred = np.mean(y_predFull)
+        numerator = sum( (y_trueFull - avgTrue )*(y_predFull-avgPred) )**2
+        denom = sum( (y_trueFull - avgTrue)**2) * sum( (y_predFull- avgPred)**2 )
+        error = numerator/denom     
+
+        fo.write( ' %s-err:%f %s-nlik:%f' % ( self.prefix, error, self.prefix, -sum_loglike/ninst) )
+
+
 
 # Model parameter
 class NNParam:
