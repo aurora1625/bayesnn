@@ -11,7 +11,7 @@ Running MNIST experiment
 
 * change the param.path_data in demo/mnist-sghmc.py to your dataset
 * python mnist-sghmc.py 2>log.txt
-* note: the evaluation statistics comes out from stderr, which is redircted into log.txt in last command
+* note: the evaluation statistics comes out from stderr, which is redirected into log.txt in last command
 
 How to adapting to other classification experiment:
 
