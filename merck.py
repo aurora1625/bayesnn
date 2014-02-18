@@ -40,7 +40,8 @@ def cfg_param():
     param = nnet.NNParam()
     param.init_sigma = 0.01
     param.input_size = 4306     #the number of features: make sure this matches the given file
-    param.num_class = 10         #changed from 10
+    param.num_class = 1
+    param.out_type = 'linear'
     param.eta = 0.1
     param.mdecay = 0.1
     param.wd = 0.0
@@ -53,9 +54,9 @@ def run_exp( param ):
     print 'network configure end, start loading data ...'
 
     # load in data 
-    train_images, train_labels = load( param.path_data1 ) #'/Users/jasonxu/bayesnn/MerckTrainSet/ACT4_competition_training.csv'
+    train_xdata, train_ylabels = load( param.path_data1 ) #'/Users/jasonxu/bayesnn/MerckTrainSet/ACT4_competition_training.csv'
     #test_images , test_labels  = load( param.path_data2 ) #'/Users/jasonxu/bayesnn/MerckTrainSet/ACT7_competition_training.csv'
-    train_xdata, train_ylabel  = nncfg.create_batch( train_images, train_labels, param.batch_size, True, 1.0/256.0 )
+    train_xdata, train_ylabel  = nncfg.create_batch( train_xdata, train_ylabels, param.batch_size, True )
     #test_xdata , test_ylabel   = nncfg.create_batch( test_images , test_labels, param.batch_size, True, 1.0/256.0 )
     
     # split validation set
@@ -70,7 +71,6 @@ def run_exp( param ):
     evals = []
     evals.append( nnet.NNEvaluatorMerck( net, train_xdata, train_ylabel, param, 'train' ))
     evals.append( nnet.NNEvaluatorMerck( net, valid_xdata, valid_ylabel, param, 'valid' ))
-    #evals.append( nnet.NNEvaluator( net, test_xdata ,  test_ylabel, param, 'test'  ))    
     
     # set parameters
     param.num_train = train_ylabel.size

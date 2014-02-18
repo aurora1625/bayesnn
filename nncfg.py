@@ -31,6 +31,17 @@ class NNFactory:
             return [ nnupdater.HyperUpdater( self.param, [u] ) for u in updaterlist ]
         else:
             raise 'NNConfig', 'unknown hyperupdater'
+
+    def create_outlayer( self, i_node, o_label ):
+        param = self.param
+        if param.out_type == 'softmax':
+            return nnet.SoftmaxLayer( o_node, o_label )
+        elif param.out_type == 'linear':
+            return nnet.RegressionLayer( o_node, o_label, 'linear' ) 
+        elif param.out_type == 'logistic':
+            return nnet.RegressionLayer( o_node, o_label, 'logistic' )
+        else:
+            raise 'NNConfig', 'unknown out_type'
         
 def softmax( param ):
     factory = NNFactory( param )
@@ -40,7 +51,7 @@ def softmax( param ):
     o_label = np.zeros( (param.batch_size), 'int8' )
     nodes = [ i_node, o_node ]
     layers = [ nnet.FullLayer( i_node, o_node, param.init_sigma, param.rec_gsqr() )  ]
-    layers+= [ nnet.SoftmaxLayer( o_node, o_label ) ]
+    layers+= [ factory.create_outlayer( o_node, o_label ) ]
     net = nnet.NNetwork( layers, nodes, o_label, factory )    
     return net
 
@@ -56,7 +67,8 @@ def mlp2layer( param ):
     layers = [ nnet.FullLayer( i_node, h1_node, param.init_sigma, param.rec_gsqr() )  ]
     layers+= [ nnet.ActiveLayer( h1_node, h2_node, param.node_type )   ]
     layers+= [ nnet.FullLayer( h2_node, o_node, param.init_sigma, param.rec_gsqr() )  ]
-    layers+= [ nnet.SoftmaxLayer( o_node, o_label ) ]
+    layers+= [ factory.create_outlayer( o_node, o_label ) ]
+
     net = nnet.NNetwork( layers, nodes, o_label, factory )    
     return net
 
@@ -82,8 +94,7 @@ def mlp3layer( param ):
 
     layers+= [ nnet.FullLayer( h2_node2, o_node, param.init_sigma, param.rec_gsqr() )  ]
 
-    layers+= [ nnet.SoftmaxLayer( o_node, o_label ) ]
-    net = nnet.NNetwork( layers, nodes, o_label, factory )
+    layers+= [ factory.create_outlayer( o_node, o_label ) ]
     return net
 
 def create_net( param ):
