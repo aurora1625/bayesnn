@@ -32,7 +32,7 @@ class NNFactory:
         else:
             raise 'NNConfig', 'unknown hyperupdater'
 
-    def create_outlayer( self, i_node, o_label ):
+    def create_outlayer( self, o_node, o_label ):
         param = self.param
         if param.out_type == 'softmax':
             return nnet.SoftmaxLayer( o_node, o_label )
@@ -107,7 +107,10 @@ def create_net( param ):
     else:
         raise 'NNConfig', 'unknown net_type'
 
-# create a batch for mnist
+# create a batch data from existing training data
+# nbatch: batch size
+# doshuffle: whether shuffle data first befor batch
+# scale: scale the feature by scale
 def create_batch( images, labels, nbatch, doshuffle=False, scale=1.0 ):
     if labels.shape[0] % nbatch != 0:
         print '%d data will be dropped during batching' % (labels.shape[0] % nbatch)

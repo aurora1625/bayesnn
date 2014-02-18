@@ -12,7 +12,7 @@ param.num_round = 800
 param.num_hidden = 100
 
 # change the following line to PATH/TO/MNIST dataset
-param.path_data = '/Users/jasonxu/bayesnn/'
+param.path_data = '../../../../data/mnist'
 
 param.net_type = 'mlp2'
 param.updater  = 'hmc'

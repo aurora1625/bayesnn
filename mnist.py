@@ -68,6 +68,11 @@ def run_exp( param ):
     # load in data 
     train_images, train_labels = load( range(10), 'training', param.path_data )
     test_images , test_labels  = load( range(10), 'testing' , param.path_data )
+
+    # create a batch data
+    # nbatch: batch size
+    # doshuffle: True, shuffle the data 
+    # scale: 1.0/256 scale by this factor so all features are in [0,1]
     train_xdata, train_ylabel  = nncfg.create_batch( train_images, train_labels, param.batch_size, True, 1.0/256.0 )
     test_xdata , test_ylabel   = nncfg.create_batch( test_images , test_labels, param.batch_size, True, 1.0/256.0 )
     
