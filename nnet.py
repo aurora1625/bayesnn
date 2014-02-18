@@ -104,6 +104,27 @@ class SoftmaxLayer:
     def params( self ):
         return []
 
+class RegressionLayer:
+    def __init__( self, i_node, o_label, n_type = 'linear' ):
+        assert i_node.shape[1] == o_label.shape[1]
+        assert i_node.shape[1] == o_label.size
+        assert i_node.shape[0] == 1
+        self.i_node  = i_node
+        self.o_label = o_label
+        
+    def forward( self, istrain = True ):        
+        nbatch = self.i_node.shape[0]
+        if n_type == 'logistic':
+            self.i_node[:] = 1.0 / ( 1.0 + np.exp( -self.i_node ) )
+                
+    def backprop( self, passgrad = True ):
+        if passgrad:
+            nbatch = self.i_node.shape[0]
+            self.i_node[:] = self.o_label.reshape( nbatch, 1 ) - self.i_node[:]
+
+    def params( self ):
+        return []
+
 class NNetwork:
     def __init__( self, layers, nodes, o_label, factory ):
         self.nodes   = nodes
@@ -196,7 +217,7 @@ class NNEvaluatorMerck:
         assert xdatas.shape[0] == ylabels.shape[0]
         assert nbatch == xdatas.shape[1]
         assert nbatch == ylabels.shape[1]
-        self.o_pred  = np.zeros( ( xdatas.shape[0], nbatch, nclass ), 'float32'  )
+        self.o_pred  = np.zeros( ( xdatas.shape[0], nbatch, param.num_class ), 'float32'  )
         self.rcounter = 0
         self.sum_wsample = 0.0
 
@@ -212,20 +233,15 @@ class NNEvaluatorMerck:
         alpha = self.__get_alpha()        
         self.o_pred[:] *= ( 1.0 - alpha )
         sum_bad  = 0.0
-        sum_loglike = 0.0
         y_predFull = np.array([])
         y_trueFull = np.array([])
 
         #need to fix functions for prediction:
         for i in xrange( self.xdatas.shape[0] ):
             self.o_pred[i,:] += alpha * self.nnet.predict( self.xdatas[i] )
-            y_pred = np.argmax( self.o_pred[i,:], 1 )   #THESE LINES need to be changed for the proper predicted value          
+            y_pred = self.o_pred[i,0,0]   #THESE LINES need to be changed for the proper predicted value          
             y_predFull = np.append(y_predFull, y_pred )        #store all predicted values            
             y_trueFull = np.append(y_trueFull, self.ylabels[i,:] )      #can speed up by not using append..
-
-
-            for j in xrange( self.xdatas.shape[1] ):
-                sum_loglike += np.log( self.o_pred[ i , j, self.ylabels[i,j] ] )
 
         ninst = self.ylabels.size
 
@@ -235,9 +251,7 @@ class NNEvaluatorMerck:
         denom = sum( (y_trueFull - avgTrue)**2) * sum( (y_predFull- avgPred)**2 )
         error = numerator/denom     
 
-        fo.write( ' %s-err:%f %s-nlik:%f' % ( self.prefix, error, self.prefix, -sum_loglike/ninst) )
-
-
+        fo.write( ' %s-err:%f' % ( self.prefix, error ) )
 
 # Model parameter
 class NNParam:
@@ -245,6 +259,8 @@ class NNParam:
         # network type
         self.net_type = 'mlp2'
         self.node_type = 'sigmoid'
+        self.out_type  = 'softmax'
+        #------------------------------------
         # learning rate
         self.eta = 0.01
         # momentum decay
@@ -272,7 +288,7 @@ class NNParam:
         self.start_hsample = 1
         # Gamma(alpha, beta) prior on regularizer
         self.hyper_alpha = 1.0
-        self.hyper_beta  = 1.0
+        self.hyper_beta  = 1.0        
         # sample hyper parameter each gap_hsample over training data
         self.gap_hsample = 1
         #-----------------------------------
@@ -283,7 +299,7 @@ class NNParam:
         self.alpha_decay = 1.0
         self.decay_momentum = 0
         self.init_eta = None
-        self.init_mdecay = None
+        self.init_mdecay = None        
         #-----------------------
         # following things are not set by user
         # sample weight
