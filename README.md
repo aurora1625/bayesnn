@@ -3,8 +3,9 @@ bayesnn
 
 Simple numpy implementation of (Bayesian) Neural Network 
 
-=======
+
 Instructions
+=======
 
 Running MNIST experiment
 
