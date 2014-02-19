@@ -32,14 +32,21 @@ class NNFactory:
         else:
             raise 'NNConfig', 'unknown hyperupdater'
 
+    def create_olabel( self ):
+        param = self.param
+        if param.out_type == 'softmax':
+            return np.zeros((param.batch_size),'int8')
+        else:
+            return np.zeros((param.batch_size),'float32')
+
     def create_outlayer( self, o_node, o_label ):
         param = self.param
         if param.out_type == 'softmax':
             return nnet.SoftmaxLayer( o_node, o_label )
         elif param.out_type == 'linear':
-            return nnet.RegressionLayer( o_node, o_label, 'linear' ) 
+            return nnet.RegressionLayer( o_node, o_label, param ) 
         elif param.out_type == 'logistic':
-            return nnet.RegressionLayer( o_node, o_label, 'logistic' )
+            return nnet.RegressionLayer( o_node, o_label, param )
         else:
             raise 'NNConfig', 'unknown out_type'
         
@@ -48,11 +55,13 @@ def softmax( param ):
     # setup network for softmax
     i_node = np.zeros( (param.batch_size, param.input_size), 'float32' )
     o_node = np.zeros( (param.batch_size, param.num_class), 'float32' )
-    o_label = np.zeros( (param.batch_size), 'int8' )
+    o_label = factory.create_olabel()
+
     nodes = [ i_node, o_node ]
     layers = [ nnet.FullLayer( i_node, o_node, param.init_sigma, param.rec_gsqr() )  ]
+
     layers+= [ factory.create_outlayer( o_node, o_label ) ]
-    net = nnet.NNetwork( layers, nodes, o_label, factory )    
+    net = nnet.NNetwork( layers, nodes, o_label, factory ) 
     return net
 
 def mlp2layer( param ):
@@ -62,7 +71,8 @@ def mlp2layer( param ):
     o_node = np.zeros( (param.batch_size, param.num_class), 'float32' )
     h1_node = np.zeros( (param.batch_size, param.num_hidden), 'float32' )
     h2_node = np.zeros_like( h1_node )
-    o_label = np.zeros( (param.batch_size), 'int8' )    
+    o_label = factory.create_olabel()
+
     nodes = [ i_node, h1_node, h2_node, o_node ]
     layers = [ nnet.FullLayer( i_node, h1_node, param.init_sigma, param.rec_gsqr() )  ]
     layers+= [ nnet.ActiveLayer( h1_node, h2_node, param.node_type )   ]
@@ -83,7 +93,8 @@ def mlp3layer( param ):
     h1_node2 = np.zeros( (param.batch_size, param.num_hidden2), 'float32' )
     h2_node2 = np.zeros_like( h1_node2 )
     
-    o_label = np.zeros( (param.batch_size), 'int8' )    
+    o_label = factory.create_olabel()
+
     nodes = [ i_node, h1_node, h2_node, h1_node2, h2_node2, o_node ]
 
     layers = [ nnet.FullLayer( i_node, h1_node, param.init_sigma, param.rec_gsqr() )  ]

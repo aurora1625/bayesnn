@@ -105,23 +105,46 @@ class SoftmaxLayer:
         return []
 
 class RegressionLayer:
-    def __init__( self, i_node, o_label, n_type = 'linear' ):
-        assert i_node.shape[1] == o_label.shape[1]
-        assert i_node.shape[1] == o_label.size
-        assert i_node.shape[0] == 1
+    def __init__( self, i_node, o_label, param ):
+        assert i_node.shape[0] == o_label.shape[0]
+        assert i_node.shape[0] == o_label.size
+        assert i_node.shape[1] == 1
+        self.i_tmp  = np.zeros_like( i_node )
+        self.n_type = param.out_type
         self.i_node  = i_node
         self.o_label = o_label
-        
-    def forward( self, istrain = True ):        
+        self.param = param
+        self.base_score = None
+
+    def init_params( self ):
+        if self.base_score != None:
+            return
+        param = self.param
+        self.scale = param.max_label - param.min_label;
+        self.min_label = param.min_label
+        self.base_score = (param.avg_label - param.min_label) / self.scale
+        if self.n_type == 'logistic':
+            self.base_score = - math.log( 1.0 / self.base_score - 1.0 );
+        print 'range=[%f,%f], base=%f' %( self.min_label, param.max_label, param.avg_label )
+    def forward( self, istrain = True ):     
+        self.init_params()
         nbatch = self.i_node.shape[0]
-        if n_type == 'logistic':
+        self.i_node[:] += self.base_score
+        if self.n_type == 'logistic':
             self.i_node[:] = 1.0 / ( 1.0 + np.exp( -self.i_node ) )
-                
+
+        self.i_tmp[:] = self.i_node[:]
+
+        # transform to approperiate output
+        self.i_node[:] = self.i_node * self.scale + self.min_label
+        
     def backprop( self, passgrad = True ):
         if passgrad:
             nbatch = self.i_node.shape[0]
-            self.i_node[:] = self.o_label.reshape( nbatch, 1 ) - self.i_node[:]
-
+            label = (self.o_label.reshape( nbatch, 1 ) - self.min_label) / self.scale
+            self.i_node[:] = self.i_tmp[:] - label
+            #print np.sum( np.sum( (label - self.i_tmp[:])**2 ) )
+            
     def params( self ):
         return []
 
@@ -204,54 +227,6 @@ class NNEvaluator:
 
         ninst = self.ylabels.size
         fo.write( ' %s-err:%f %s-nlik:%f' % ( self.prefix, sum_bad/ninst, self.prefix, -sum_loglike/ninst) )
-
-
-class NNEvaluatorMerck:
-    def __init__( self, nnet, xdatas, ylabels, param, prefix='' ):
-        self.nnet = nnet
-        self.xdatas  = xdatas
-        self.ylabels = ylabels
-        self.param = param
-        self.prefix = prefix
-        nbatch, nclass = nnet.o_node.shape
-        assert xdatas.shape[0] == ylabels.shape[0]
-        assert nbatch == xdatas.shape[1]
-        assert nbatch == ylabels.shape[1]
-        self.o_pred  = np.zeros( ( xdatas.shape[0], nbatch, param.num_class ), 'float32'  )
-        self.rcounter = 0
-        self.sum_wsample = 0.0
-
-    def __get_alpha( self ):
-        if self.rcounter < self.param.num_burn:
-            return 1.0
-        else:
-            self.sum_wsample += self.param.wsample
-            return self.param.wsample / self.sum_wsample
-        
-    def eval( self, rcounter, fo ):
-        self.rcounter = rcounter
-        alpha = self.__get_alpha()        
-        self.o_pred[:] *= ( 1.0 - alpha )
-        sum_bad  = 0.0
-        y_predFull = np.array([])
-        y_trueFull = np.array([])
-
-        #need to fix functions for prediction:
-        for i in xrange( self.xdatas.shape[0] ):
-            self.o_pred[i,:] += alpha * self.nnet.predict( self.xdatas[i] )
-            y_pred = self.o_pred[i,0,0]   #THESE LINES need to be changed for the proper predicted value          
-            y_predFull = np.append(y_predFull, y_pred )        #store all predicted values            
-            y_trueFull = np.append(y_trueFull, self.ylabels[i,:] )      #can speed up by not using append..
-
-        ninst = self.ylabels.size
-
-        avgTrue = np.mean(y_trueFull)
-        avgPred = np.mean(y_predFull)
-        numerator = sum( (y_trueFull - avgTrue )*(y_predFull-avgPred) )**2
-        denom = sum( (y_trueFull - avgTrue)**2) * sum( (y_predFull- avgPred)**2 )
-        error = numerator/denom     
-
-        fo.write( ' %s-err:%f' % ( self.prefix, error ) )
 
 # Model parameter
 class NNParam:

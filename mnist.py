@@ -48,11 +48,13 @@ def load(digits, dataset = "training", path = "."):
 
     return images, labels
 
-# default parameter
+# default parameters
 def cfg_param():
     param = nnet.NNParam()
     param.init_sigma = 0.01
+    # input size, for mnist, it is 28*28
     param.input_size = 28 * 28
+    # number of output class
     param.num_class = 10
     param.eta = 0.1
     param.mdecay = 0.1
