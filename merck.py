@@ -19,6 +19,54 @@ import nnet
 #for now, commented out test set parts
 #changed param input size, param num class
 
+class NNEvaluatorMerck:
+    def __init__( self, nnet, xdatas, ylabels, param, prefix='' ):
+        self.nnet = nnet
+        self.xdatas  = xdatas
+        self.ylabels = ylabels
+        self.param = param
+        self.prefix = prefix
+        nbatch, nclass = nnet.o_node.shape
+        assert xdatas.shape[0] == ylabels.shape[0]
+        assert nbatch == xdatas.shape[1]
+        assert nbatch == ylabels.shape[1]
+        self.o_pred  = np.zeros( ( xdatas.shape[0], nbatch, param.num_class ), 'float32'  )
+        self.rcounter = 0
+        self.sum_wsample = 0.0
+
+    def __get_alpha( self ):
+        if self.rcounter < self.param.num_burn:
+            return 1.0
+        else:
+            self.sum_wsample += self.param.wsample
+            return self.param.wsample / self.sum_wsample
+        
+    def eval( self, rcounter, fo ):
+        self.rcounter = rcounter
+        alpha = self.__get_alpha()        
+        self.o_pred[:] *= ( 1.0 - alpha )
+        nbatch = self.xdatas.shape[1]
+        sum_bad  = 0.0        
+
+        y_predFull = np.array([])
+        y_trueFull = np.array([])
+        # need to fix functions for prediction:
+        for i in xrange( self.xdatas.shape[0] ):
+            self.o_pred[i,:] += alpha * self.nnet.predict( self.xdatas[i] )
+            y_pred = self.o_pred[i,:].reshape( (nbatch) )   
+            y_predFull = np.append(y_predFull, y_pred )     
+            y_trueFull = np.append(y_trueFull, self.ylabels[i,:].reshape( (nbatch) ) )    
+
+        ninst = self.ylabels.size
+
+        avgTrue = np.mean(y_trueFull)
+        avgPred = np.mean(y_predFull)
+        numerator = sum( (y_trueFull - avgTrue )*(y_predFull-avgPred) )**2
+        denom = sum( (y_trueFull - avgTrue)**2) * sum( (y_predFull- avgPred)**2 )
+        rst = numerator/denom     
+
+        fo.write( ' %s-r2:%f' % ( self.prefix, rst ) )
+
 # load Merck dataset
 def load(filePath):
     f = open(filePath)
@@ -30,8 +78,11 @@ def load(filePath):
         dataList.append(sample)
     dataList = np.array(dataList)
     labels = np.array([x[0] for x in dataList])  #pull out true labels from first column
-    #labels = dataList[:,0]
     features = dataList[:,1:]
+    fmax = np.max( features, 0 )  # standardization
+    fmax = np.maximum( fmax, 1.0 )
+    assert np.min( np.min(features[:]) ) > -1e-6
+    features = features / fmax
     return features, labels     #each row corresponds to a molecule id/observation, each column a is molecule descriptor/feature
 
 
@@ -50,30 +101,37 @@ def cfg_param():
 
 def run_exp( param ):
     np.random.seed( param.seed )
-    net = nncfg.create_net( param )
-    print 'network configure end, start loading data ...'
 
+    print 'start loading data ...'
     # load in data 
-    train_xdata, train_ylabels = load( param.path_data1 ) #'/Users/jasonxu/bayesnn/MerckTrainSet/ACT4_competition_training.csv'
-    #test_images , test_labels  = load( param.path_data2 ) #'/Users/jasonxu/bayesnn/MerckTrainSet/ACT7_competition_training.csv'
-    train_xdata, train_ylabel  = nncfg.create_batch( train_xdata, train_ylabels, param.batch_size, True )
-    #test_xdata , test_ylabel   = nncfg.create_batch( test_images , test_labels, param.batch_size, True, 1.0/256.0 )
+    train_xdata, train_ylabel = load( param.path_data ) #'/Users/jasonxu/bayesnn/MerckTrainSet/ACT4_competition_training.csv'
     
     # split validation set
     ntrain = train_xdata.shape[0]    
-    nvalid = 500
-    assert nvalid % param.batch_size == 0
-    nvalid = nvalid / param.batch_size
+    nvalid = ntrain / 5
+
     valid_xdata, valid_ylabel = train_xdata[0:nvalid], train_ylabel[0:nvalid]
     train_xdata, train_ylabel = train_xdata[nvalid:ntrain], train_ylabel[nvalid:ntrain]
     
+    train_xdata, train_ylabel  = nncfg.create_batch( train_xdata, train_ylabel, param.batch_size, True )
+    valid_xdata, valid_ylabel  = nncfg.create_batch( valid_xdata, valid_ylabel, param.batch_size, True )
+
+    # set parameters
+    param.input_size = train_xdata.shape[2]
+    param.num_train = train_ylabel.size
+    param.min_label = np.min(train_ylabel)
+    param.max_label = np.max(train_ylabel)    
+    param.avg_label = np.mean(train_ylabel)
+
+    print 'loading end, create nnet input=%d...' % param.input_size
+    net = nncfg.create_net( param )
+
     # setup evaluator
     evals = []
-    evals.append( nnet.NNEvaluatorMerck( net, train_xdata, train_ylabel, param, 'train' ))
-    evals.append( nnet.NNEvaluatorMerck( net, valid_xdata, valid_ylabel, param, 'valid' ))
+    evals.append( NNEvaluatorMerck( net, train_xdata, train_ylabel, param, 'train' ))
+    evals.append( NNEvaluatorMerck( net, valid_xdata, valid_ylabel, param, 'valid' ))
     
-    # set parameters
-    param.num_train = train_ylabel.size
+
     print 'loading end,%d train,%d valid, start update ...' % ( train_ylabel.size, valid_ylabel.size )
         
     for it in xrange( param.num_round ):
